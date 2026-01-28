@@ -24,7 +24,7 @@ void prime(int infd){
     }else{
         close(out[READ]);
         int x;
-        while (read(infd,&x,sizeof(int)==sizeof(int))){
+        while (read(infd,&x,sizeof(int)) == sizeof(int)){
             if (x % p!=0){
                 write(out[WRITE],&x,sizeof(int));
             }
@@ -54,10 +54,13 @@ int main(int argc, char *argv[]) {
         exit(0);
 
     }
-    if (pid==0){//child
+    else if (pid==0){//child
         close(fd[WRITE]);
         prime(fd[READ]);
         exit(0);
+    }else{
+        printf(2, "fork failed\n");
+        exit(1);
     }
 
 }
