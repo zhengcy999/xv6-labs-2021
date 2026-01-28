@@ -59,7 +59,7 @@ int main(int argc, char *argv[]) {
         prime(fd[READ]);
         exit(0);
     }else{
-        printf(2, "fork failed\n");
+        fprintf(2, "fork failed\n");
         exit(1);
     }
 
