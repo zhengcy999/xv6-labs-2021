@@ -45,7 +45,7 @@ find(char *path, char *target)
   // 起点本身是文件的话，也要匹配
   if (st.type == T_FILE) {
     if (strcmp(fmtname(path), target) == 0) {
-      printf('%s\n', path);
+      printf("%s\n", path);
     }
     close(fd);
     return
@@ -71,12 +71,12 @@ find(char *path, char *target)
       memmove(name, de.name, DIRSIZ);
       name[DIRSIZ] = 0;
 
-      if (strcmp(name, '.') == 0 || stcmp(name, '..') == 0) {
+      if (strcmp(name, ".") == 0 || strcmp(name, "..") == 0) {
         continue;
       }
 
       memmove(p, de.name, DIRSIZ);
-      p[DIRSIZ] = 0
+      p[DIRSIZ] = 0;
 
       if (stat(buf, &st) < 0) {
         printf("find: cannot stat %s\n", buf);
@@ -84,7 +84,7 @@ find(char *path, char *target)
       }
 
       if (strcmp(name, target) == 0) {
-        printf('%s\n', buf);
+        printf("%s\n", buf);
       }
 
       if (st.type == T_DIR) {
@@ -99,17 +99,16 @@ find(char *path, char *target)
 int
 main(int argc, char *argv[])
 {
-  if (argc == 1) {
-    printf("incorrect command\n");
-  }
-
-  if (argc == 2) {
+  if (argc < 2) {
     find(".", argv[1]);
     exit(0);
   }
 
-  if (argc == 3) {
+  else if (argc == 3) {
     find(argv[1], argv[2]);
     exit(0);
+  }
+  else {
+    printf("incorrect command\n");
   }
 }
