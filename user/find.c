@@ -48,14 +48,14 @@ find(char *path, char *target)
       printf("%s\n", path);
     }
     close(fd);
-    return
+    return;
   }
 
   if (st.type == T_DIR) {
     if (strlen(path) + 1 + DIRSIZ + 1 > sizeof buf) {
       printf("find: path too long\n");
       close(fd);
-      return
+      return;
     }
 
     strcpy(buf, path);
@@ -99,7 +99,7 @@ find(char *path, char *target)
 int
 main(int argc, char *argv[])
 {
-  if (argc < 2) {
+  if (argc ==2) {
     find(".", argv[1]);
     exit(0);
   }
