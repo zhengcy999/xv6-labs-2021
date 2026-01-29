@@ -110,5 +110,6 @@ main(int argc, char *argv[])
   }
   else {
     printf("incorrect command\n");
+    exit(1);
   }
 }
