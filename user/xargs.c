@@ -2,6 +2,7 @@
 #include "kernel/stat.h"
 #include "kernel/param.h"
 #include "user/user.h"
+#include "kernel/fs.h"
 
 #define STDIN 0
 #define STDERR 2
