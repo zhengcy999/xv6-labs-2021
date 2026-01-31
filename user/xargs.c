@@ -21,12 +21,12 @@ run_once(char *base_argv[], int base_count, char *line)
 
     int j = 0;
     while (line[j] != 0) {
-    while (line[j] == ' ') {
-        j++;
-        if (line[j] == 0) {
+        while (line[j] == ' ')
+            j++;
+
+    // 跳过空格后如果到行尾，结束外层循环
+    if (line[j] == 0)
         break;
-        }
-    }
 
     if (exec_count >= MAXARG - 1) {
         fprintf(2, "xargs: too many args\n");
