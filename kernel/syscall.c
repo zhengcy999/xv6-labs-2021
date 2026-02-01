@@ -142,7 +142,7 @@ syscall(void)
     p->trapframe->a0 = syscalls[num]();
     if (p->tracemask & (1<<num)){
        printf("%d: syscall %s -> %d\n",
-            p->pid, syscalls[num], num);
+            p->pid,  p->name, num);
     }
   } else {
     printf("%d %s: unknown sys call %d\n",
