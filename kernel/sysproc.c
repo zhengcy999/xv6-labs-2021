@@ -109,6 +109,6 @@ sys_trace(void){
 
 uint64
 sys_sysinfo(void){
-  printf("hello sysinfo");
+  printf("hello sysinfo\n");
   return 0;
 }
