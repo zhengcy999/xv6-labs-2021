@@ -109,20 +109,25 @@ sys_trace(void){
   return 0;
 }
 
-uint64 
-sys_sysinfo(void){
-  uint64 uaddr;   // user pointer to sysinfo*
+uint64
+sys_sysinfo(void)
+{
+  uint64 uaddr;               // user pointer to struct sysinfo
   struct proc *p = myproc();
   struct sysinfo info;
-  if(argaddr(1, &uaddr) < 0)
-    return -1;
-  // info 
-  info.freemem=freemem();
-  info.nproc=nproc();
 
+  // sysinfo(info*) 只有一个参数：第0个
+  if(argaddr(0, &uaddr) < 0)
+    return -1;
+
+  info.freemem = freemem();
+  info.nproc   = nproc();
+
+  // copyout 失败必须返回 -1
   if(copyout(p->pagetable, uaddr, (char *)&info, sizeof(info)) < 0)
-      return -1;
-    return 0;
+    return -1;
+
+  return 0;
 }
 
   
