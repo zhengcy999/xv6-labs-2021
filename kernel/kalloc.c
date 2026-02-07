@@ -88,7 +88,7 @@ uint64 freemem(void){
   acquire(&kmem.lock);
   for (r = kmem.freelist;r;r=r->next){
     n++;
-    release(&kmem.lock);
   }
+  release(&kmem.lock);
   return n * PGSIZE;
 }
