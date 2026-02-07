@@ -90,5 +90,5 @@ uint64 freemem(void){
     n++;
     release(&kmem.lock);
   }
-  return n;
+  return n * PGSIZE;
 }
