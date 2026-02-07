@@ -656,15 +656,17 @@ procdump(void)
   }
 }
 
-int nproc(void){
-  struct proc *pp;
-  int n=0;
-  for (pp=proc;pp<&proc[NPROC];pp++){
-    acquire(&pp->lock);
-    if (pp->state!=UNUSED){
+int
+nproc(void)
+{
+  int n = 0;
+  struct proc *p;
+
+  for(p = proc; p < &proc[NPROC]; p++){
+    acquire(&p->lock);
+    if(p->state != UNUSED)
       n++;
-    release(&pp->lock);
-    }
+    release(&p->lock);
   }
   return n;
 }
