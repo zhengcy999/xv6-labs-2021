@@ -439,17 +439,19 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 static void
 vmprint_rec(pagetable_t pagetable, int depth)
 {
-  // there are 2^9 = 512 PTEs in a page table.
   for(int i = 0; i < 512; i++){
     pte_t pte = pagetable[i];
-    if (pte & PTE_V){
-      for (int d=0;d<depth;d++){
+    if(pte & PTE_V){
+      // indentation: repeat " .." depth times
+      for(int d = 0; d < depth; d++)
         printf(" ..");
-      }
-      uint64 pa=PTE2PA(pte);
-      printf("%d: pte %p pa %p\n", i,(void *)pte,(void *)pa);
-      if ((pte & (PTE_R | PTE_W | PTE_X))==0){
-        vmprint_rec((pagetable_t)pte,depth+1);
+
+      uint64 pa = PTE2PA(pte);
+      printf("%d: pte %p pa %p\n", i, (void*)pte, (void*)pa);
+
+      // if no R/W/X bits -> this PTE points to a lower-level page table
+      if((pte & (PTE_R | PTE_W | PTE_X)) == 0){
+        vmprint_rec((pagetable_t)pa, depth + 1);
       }
     }
   }
