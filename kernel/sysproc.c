@@ -77,10 +77,37 @@ sys_sleep(void)
 
 
 #ifdef LAB_PGTBL
-int
+uint64
 sys_pgaccess(void)
 {
   // lab pgtbl: your code here.
+  uint64 va;
+  int pages;
+  uint64 u_address;
+  if (argaddr(0,&va)<0) return -1;
+  if (argint(1,&pages)<0) return -1;
+  if (argaddr(2,&u_address)<0) return -1;
+  if (pages < 0 || pages > 32) return -1;
+  struct proc *p=myproc();
+  uint abits=0;  //掩码 bitmask
+  //对齐页边界
+  uint64 a = PGROUNDDOWN(va);
+  for(int i=0;i<pages;i++){
+    uint64 curr=a+(uint64)i*PGSIZE;
+    pte_t *pte=walk(p->pagetable,curr,0);
+    if (pte==0) return -1;
+    if ((*pte &PTE_V)==0) return -1;
+    if (((*pte) & (PTE_R | PTE_W | PTE_X)) == 0) continue;
+    if (*pte &PTE_A){
+      abits |= (1U << i);
+      *pte &=~PTE_A;
+    }
+  }
+  //刷新tlb
+  sfence_vma();
+  // copyout 
+  if(copyout(p->pagetable, u_address, (char *)&abits,sizeof(abits)) < 0)
+    return -1;
   return 0;
 }
 #endif
