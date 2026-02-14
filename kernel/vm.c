@@ -448,8 +448,8 @@ vmprint_rec(pagetable_t pagetable, int depth)
       }
       uint64 pa=PTE2PA(pte);
       printf("%d: pte %p pa %p\n", i,(void *)pte,(void *)pa);
-      if (pte & (PTE_R|PTE_W|PTE_X)==0){
-        vmprint_rec(pte,depth+1);
+      if ((pte & (PTE_R | PTE_W | PTE_X))==0){
+        vmprint_rec((pagetable_t)pte,depth+1);
       }
     }
   }
