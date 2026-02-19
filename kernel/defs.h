@@ -172,6 +172,7 @@ int             copyin(pagetable_t, char *, uint64, uint64);
 int             copyinstr(pagetable_t, char *, uint64, uint64);
 void            vmprint(pagetable_t);
 void            kvmfree(pagetable_t);
+pagetable_t     kvmcreate(void);
 pte_t *walk(pagetable_t pagetable, uint64 va, int alloc);
 extern pagetable_t kernel_pagetable;
 
