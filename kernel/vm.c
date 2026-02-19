@@ -84,8 +84,6 @@ kvmcreate(void)
   // the highest virtual address in the kernel.
   kvmmap(kp, TRAMPOLINE, (uint64)trampoline, PGSIZE, PTE_R | PTE_X);
 
-  // map kernel stacks
-  proc_mapstacks(kp);
   
   return kp;
 }
