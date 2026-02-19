@@ -56,6 +56,41 @@ kvminit(void)
   kernel_pagetable = kvmmake();
 }
 
+// create kernel page for each process
+pagetable_t
+kvmcreate(void)
+{
+  
+
+  pagetable_t kp = (pagetable_t)kalloc(); 
+  memset(kp, 0, PGSIZE);
+
+  // uart registers
+  kvmmap(kp, UART0, UART0, PGSIZE, PTE_R | PTE_W);
+
+  // virtio mmio disk interface
+  kvmmap(kp, VIRTIO0, VIRTIO0, PGSIZE, PTE_R | PTE_W);
+
+  // PLIC
+  kvmmap(kp, PLIC, PLIC, 0x400000, PTE_R | PTE_W);
+
+  // map kernel text executable and read-only.
+  kvmmap(kp, KERNBASE, KERNBASE, (uint64)etext-KERNBASE, PTE_R | PTE_X);
+
+  // map kernel data and the physical RAM we'll make use of.
+  kvmmap(kp, (uint64)etext, (uint64)etext, PHYSTOP-(uint64)etext, PTE_R | PTE_W);
+
+  // map the trampoline for trap entry/exit to
+  // the highest virtual address in the kernel.
+  kvmmap(kp, TRAMPOLINE, (uint64)trampoline, PGSIZE, PTE_R | PTE_X);
+
+  // map kernel stacks
+  proc_mapstacks(kp);
+  
+  return kp;
+}
+
+
 // Switch h/w page table register to the kernel's page table,
 // and enable paging.
 void
@@ -279,6 +314,31 @@ freewalk(pagetable_t pagetable)
     }
   }
   kfree((void*)pagetable);
+}
+
+static void
+freewalk_kpt(pagetable_t pagetable)
+{
+  for(int i = 0; i < 512; i++){
+    pte_t pte = pagetable[i];
+    if(pte & PTE_V){
+      if((pte & (PTE_R|PTE_W|PTE_X)) == 0){
+        // non-leaf: child page table page
+        uint64 child = PTE2PA(pte);
+        freewalk_kpt((pagetable_t)child);
+        kfree((void*)child);
+      }
+      // leaf: don't free mapped physical page
+      pagetable[i] = 0;
+    }
+  }
+}
+
+void
+kvmfree(pagetable_t kpt)
+{
+  freewalk_kpt(kpt);
+  kfree((void*)kpt);
 }
 
 // Free user memory pages,
