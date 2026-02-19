@@ -427,71 +427,133 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 // Copy from user to kernel.
 // Copy len bytes to dst from virtual address srcva in a given page table.
 // Return 0 on success, -1 on error.
+// int
+// copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
+// {
+//   uint64 n, va0, pa0;
+
+//   while(len > 0){
+//     va0 = PGROUNDDOWN(srcva);
+//     pa0 = walkaddr(pagetable, va0);
+//     if(pa0 == 0)
+//       return -1;
+//     n = PGSIZE - (srcva - va0);
+//     if(n > len)
+//       n = len;
+//     memmove(dst, (void *)(pa0 + (srcva - va0)), n);
+
+//     len -= n;
+//     dst += n;
+//     srcva = va0 + PGSIZE;
+//   }
+//   return 0;
+// }
+
+
+//新增用户映射到kernel pagetable 
+int  kvmmapuser(pagetable_t kpt,pagetable_t upt,uint64 oldsz, uint newsz){
+  if (newsz>PLIC){
+    return -1;
+  }
+  uint64 a = PGROUNDUP(oldsz);
+  uint64 last = PGROUNDUP(newsz);
+  for (int va=a;va<last;va+=PGSIZE){
+    pte_t *upte=walk(upt,va,0);
+    if (upte==0) return -1;
+    if ((*upte & PTE_V)==0) return -1;
+    if(((*upte) & (PTE_R|PTE_W|PTE_X)) == 0)
+      return -1;
+    uint64 pa=PTE2PA(*upte);
+    int perm=PTE_FLAGS(*upte) & (PTE_R|PTE_W|PTE_X);
+    if(mappages(kpt, va, PGSIZE, pa, perm) < 0)
+      return -1;
+  }
+  return 0;
+}
+//用户缩小把kernel pagetable 对应的映射删掉（不free 物理页）
+void kvmunmapuser(pagetable_t kpt,uint64 oldsz, uint newsz){
+  if (newsz>oldsz){
+    return;
+  }
+  uint64 a = PGROUNDUP(newsz);
+  uint64 b = PGROUNDUP(oldsz);
+  if (b>PLIC) {
+    b=PLIC;
+  }
+  if (a>=b){
+    return;
+  }
+  uvmunmap(kpt,a,(b-a)/PGSIZE,0);
+
+}
+
+
+
+
+
+
+
+
+
 int
 copyin(pagetable_t pagetable, char *dst, uint64 srcva, uint64 len)
 {
-  uint64 n, va0, pa0;
-
-  while(len > 0){
-    va0 = PGROUNDDOWN(srcva);
-    pa0 = walkaddr(pagetable, va0);
-    if(pa0 == 0)
-      return -1;
-    n = PGSIZE - (srcva - va0);
-    if(n > len)
-      n = len;
-    memmove(dst, (void *)(pa0 + (srcva - va0)), n);
-
-    len -= n;
-    dst += n;
-    srcva = va0 + PGSIZE;
-  }
-  return 0;
+  return  copyin_new(pagetable, dst, srcva,len);
 }
 
 // Copy a null-terminated string from user to kernel.
 // Copy bytes to dst from virtual address srcva in a given page table,
 // until a '\0', or max.
 // Return 0 on success, -1 on error.
+// int
+// copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
+// {
+//   uint64 n, va0, pa0;
+//   int got_null = 0;
+
+//   while(got_null == 0 && max > 0){
+//     va0 = PGROUNDDOWN(srcva);
+//     pa0 = walkaddr(pagetable, va0);
+//     if(pa0 == 0)
+//       return -1;
+//     n = PGSIZE - (srcva - va0);
+//     if(n > max)
+//       n = max;
+
+//     char *p = (char *) (pa0 + (srcva - va0));
+//     while(n > 0){
+//       if(*p == '\0'){
+//         *dst = '\0';
+//         got_null = 1;
+//         break;
+//       } else {
+//         *dst = *p;
+//       }
+//       --n;
+//       --max;
+//       p++;
+//       dst++;
+//     }
+
+//     srcva = va0 + PGSIZE;
+//   }
+//   if(got_null){
+//     return 0;
+//   } else {
+//     return -1;
+//   }
+// }
+
 int
 copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 {
-  uint64 n, va0, pa0;
-  int got_null = 0;
-
-  while(got_null == 0 && max > 0){
-    va0 = PGROUNDDOWN(srcva);
-    pa0 = walkaddr(pagetable, va0);
-    if(pa0 == 0)
-      return -1;
-    n = PGSIZE - (srcva - va0);
-    if(n > max)
-      n = max;
-
-    char *p = (char *) (pa0 + (srcva - va0));
-    while(n > 0){
-      if(*p == '\0'){
-        *dst = '\0';
-        got_null = 1;
-        break;
-      } else {
-        *dst = *p;
-      }
-      --n;
-      --max;
-      p++;
-      dst++;
-    }
-
-    srcva = va0 + PGSIZE;
-  }
-  if(got_null){
-    return 0;
-  } else {
-    return -1;
-  }
+  return  copyinstr_new(pagetable, dst, srcva, max);
 }
 
+int copyinstr_new(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
+{
+  return  copyinstr_new(pagetable, dst, srcva, max);
+}
 
 //todo vmprint()
 

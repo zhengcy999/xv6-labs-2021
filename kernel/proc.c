@@ -288,6 +288,8 @@ userinit(void)
   // and data into it.
   uvminit(p->pagetable, initcode, sizeof(initcode));
   p->sz = PGSIZE;
+  kvmmapuser(p->kpagetable, p->pagetable, 0, p->sz);
+
 
   // prepare for the very first "return" from kernel to user.
   p->trapframe->epc = 0;      // user program counter
@@ -306,18 +308,39 @@ userinit(void)
 int
 growproc(int n)
 {
-  uint sz;
+  //uint sz;
   struct proc *p = myproc();
 
-  sz = p->sz;
+  // sz = p->sz;
+  uint64 oldsz = p->sz;
+  uint64 newsz = oldsz;
+  
+  if (n>0 & n+p->sz>=PLIC){
+    return -1;
+  }
   if(n > 0){
-    if((sz = uvmalloc(p->pagetable, sz, sz + n)) == 0) {
+    if (oldsz>(uint64)PLIC-(uint64)n){
       return -1;
     }
+    newsz=uvmalloc(p->pagetable, oldsz, oldsz + n);
+    if (newsz==0){
+      return -1;
+    }
+    if (kvmmapuser(p->kpagetable, p->pagetable, oldsz, newsz)<0){
+      uvmalloc(p->pagetable,newsz,oldsz);
+      return -1;
+    };
+
+    // if((sz = uvmalloc(p->pagetable, sz, sz + n)) == 0) {
+    //   return -1;
+    // }
   } else if(n < 0){
-    sz = uvmdealloc(p->pagetable, sz, sz + n);
+    newsz = uvmdealloc(p->pagetable, oldsz, oldsz + n);
+    kvmunmapuser(p->kpagetable,oldsz,newsz);
+    sfence_vma();
   }
-  p->sz = sz;
+  //p->sz = sz;
+  p->sz = newsz;
   return 0;
 }
 
@@ -342,6 +365,11 @@ fork(void)
     return -1;
   }
   np->sz = p->sz;
+  if (kvmmapuser(np->kpagetable,np->pagetable,0,np->sz)<0){
+    freeproc(np);
+    release(&np->lock);
+    return -1;
+  };
 
   // copy saved user registers.
   *(np->trapframe) = *(p->trapframe);
