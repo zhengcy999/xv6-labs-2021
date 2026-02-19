@@ -43,8 +43,8 @@ kvmmake(void)
   // the highest virtual address in the kernel.
   kvmmap(kpgtbl, TRAMPOLINE, (uint64)trampoline, PGSIZE, PTE_R | PTE_X);
 
-  // map kernel stacks
-  proc_mapstacks(kpgtbl);
+  // // map kernel stacks
+  // proc_mapstacks(kpgtbl);
   
   return kpgtbl;
 }
@@ -83,6 +83,7 @@ kvmcreate(void)
   // map the trampoline for trap entry/exit to
   // the highest virtual address in the kernel.
   kvmmap(kp, TRAMPOLINE, (uint64)trampoline, PGSIZE, PTE_R | PTE_X);
+
 
   
   return kp;
