@@ -550,10 +550,6 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   return  copyinstr_new(pagetable, dst, srcva, max);
 }
 
-int copyinstr_new(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
-{
-  return  copyinstr_new(pagetable, dst, srcva, max);
-}
 
 //todo vmprint()
 
