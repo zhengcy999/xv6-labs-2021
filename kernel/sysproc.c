@@ -105,19 +105,23 @@ sys_sigreturn(void)
   return 0;
 }
 
+
 uint64
 sys_sigalarm(void)
 {
   int n;
-  int fn;
-  if (argint(n,0)<0 || argint(1,&fn)<0){
+  uint64 fn;
+
+  // 1. 获取第 0 个参数(int) 到 n
+  // 2. 获取第 1 个参数(uint64 地址) 到 fn
+  if (argint(0, &n) < 0 || argaddr(1, &fn) < 0)
     return -1;
-  }
-  struct proc *p=myproc();
-  p->alarm_interval=n;
-  p->alarm_handler=(void(*)())fn;
-  p->ticks_passed=0;
+
+  struct proc *p = myproc();
+  p->alarm_interval = n;
+  p->alarm_handler = (void (*)())fn; 
+  p->ticks_passed = 0;
+
   return 0;
 }
-
 
