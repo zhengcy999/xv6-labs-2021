@@ -37,6 +37,7 @@ void
 usertrap(void)
 {
   int which_dev = 0;
+  
 
   if((r_sstatus() & SSTATUS_SPP) != 0)
     panic("usertrap: not from user mode");
@@ -46,6 +47,8 @@ usertrap(void)
   w_stvec((uint64)kernelvec);
 
   struct proc *p = myproc();
+
+  
   
   // save user program counter.
   p->trapframe->epc = r_sepc();
@@ -77,8 +80,18 @@ usertrap(void)
     exit(-1);
 
   // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2)
+  if(which_dev == 2){
+    if (p->alarm_interval > 0){
+      p->ticks_passed++;
+      // 只有到了时间才执行跳转逻辑
+      if (p->ticks_passed == p->alarm_interval){
+        p->ticks_passed = 0;
+        // 核心跳转逻辑必须在 if 里面
+        p->trapframe->epc = (uint64)p->alarm_handler;
+      }
+    }
     yield();
+  }
 
   usertrapret();
 }
