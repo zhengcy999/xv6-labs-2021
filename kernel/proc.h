@@ -110,5 +110,6 @@ struct proc {
   int ticks_passed;
 
   struct trapframe *alarm_trapframe;
+  int is_alarm_running;
 
 };
