@@ -87,6 +87,7 @@ usertrap(void)
       if (p->ticks_passed == p->alarm_interval){
         *p->alarm_trapframe = *p->trapframe;
         p->ticks_passed = 0;
+        p->is_alarm_running=1;
         // 核心跳转逻辑必须在 if 里面
         p->trapframe->epc = (uint64)p->alarm_handler;
       }
