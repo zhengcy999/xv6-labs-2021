@@ -184,20 +184,16 @@ brelse(struct buf *b)
     panic("brelse");
 
   releasesleep(&b->lock);
+  int idx=b->blockno%NBUCKETS;
 
-  acquire(&bcache.lock);
+  acquire(&bcache.bucket_locks[idx]);
   b->refcnt--;
   if (b->refcnt == 0) {
     // no one is waiting for it.
-    b->next->prev = b->prev;
-    b->prev->next = b->next;
-    b->next = bcache.head.next;
-    b->prev = &bcache.head;
-    bcache.head.next->prev = b;
-    bcache.head.next = b;
+    b->timestamp=ticks;
   }
   
-  release(&bcache.lock);
+  release(&bcache.bucket_locks[idx]);
 }
 
 void
