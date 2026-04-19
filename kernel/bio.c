@@ -23,14 +23,27 @@
 #include "fs.h"
 #include "buf.h"
 
-struct {
-  struct spinlock lock;
-  struct buf buf[NBUF];
+// struct {
+//   struct spinlock lock;
+//   struct buf buf[NBUF];
 
-  // Linked list of all buffers, through prev/next.
-  // Sorted by how recently the buffer was used.
-  // head.next is most recent, head.prev is least.
-  struct buf head;
+//   // Linked list of all buffers, through prev/next.
+//   // Sorted by how recently the buffer was used.
+//   // head.next is most recent, head.prev is least.
+//   struct buf head;
+// } bcache;
+
+#define NBUCKETS 13
+
+struct {
+  struct spinlock lock;            // 全局锁：用于保护整个替换（eviction）逻辑
+  struct buf buf[NBUF];            // 所有的缓存块
+
+  // 哈希桶：每个桶是一个链表的头部
+  struct buf buckets[NBUCKETS];    
+  
+  // 每个桶对应一把锁：这才是降低竞争的关键
+  struct spinlock bucket_locks[NBUCKETS]; 
 } bcache;
 
 void
@@ -39,16 +52,19 @@ binit(void)
   struct buf *b;
 
   initlock(&bcache.lock, "bcache");
+  for(int i=0;i<NBUCKETS;i++){
+    initlock(&bcache.bucket_locks[i],"bcache");
+    bcache.buckets[i].next=0;
+  }
 
-  // Create linked list of buffers
-  bcache.head.prev = &bcache.head;
-  bcache.head.next = &bcache.head;
   for(b = bcache.buf; b < bcache.buf+NBUF; b++){
-    b->next = bcache.head.next;
-    b->prev = &bcache.head;
     initsleeplock(&b->lock, "buffer");
-    bcache.head.next->prev = b;
-    bcache.head.next = b;
+    b->next=bcache.buckets[0].next;
+    b->prev = &bcache.buckets[0];
+    if(bcache.buckets[0].next != 0) // 如果后面本来就有节点
+      bcache.buckets[0].next->prev = b;
+    bcache.buckets[0].next=b;
+    b->timestamp=0;
   }
 }
 
@@ -59,34 +75,82 @@ static struct buf*
 bget(uint dev, uint blockno)
 {
   struct buf *b;
-
-  acquire(&bcache.lock);
-
-  // Is the block already cached?
-  for(b = bcache.head.next; b != &bcache.head; b = b->next){
-    if(b->dev == dev && b->blockno == blockno){
+  int idx=blockno%NBUCKETS;
+  //1. acquire the bucket locker to check
+  acquire(&bcache.bucket_locks[idx]);
+  //第一阶段：桶内快速查找 (Fast Path) 首先只锁定目标桶，看看块是否已经在缓存里。
+  for (b = bcache.buckets[idx].next;b!=0;b=b->next){
+    if (b->dev==dev && b->blockno==blockno){
       b->refcnt++;
+      release(&bcache.bucket_locks[idx]);
+      acquiresleep(&b->lock);
+      return b;
+    }
+  }
+  // 如果没找到，说明发生了缓存未命中 (Cache Miss)
+  // 我们需要释放桶锁，去寻找一个牺牲者 (Victim)
+  release(&bcache.bucket_locks[idx]);
+  //第二阶段：准备驱逐牺牲者 (Slow Path - Eviction) 当缓存没命中时，我们需要全场寻找最久没用的块（timestamp 最小）。为了保证过程原子性，这里要用全局锁。
+  acquire(&bcache.lock);
+  // 在我们释放桶锁到拿到全局锁的间隙，可能有其他 CPU 把这个块读进来了
+  acquire(&bcache.bucket_locks[idx]);
+  for (b = bcache.buckets[idx].next;b!=0;b=b->next){
+    if (b->dev==dev && b->blockno==blockno){
+      b->refcnt++;
+      release(&bcache.bucket_locks[idx]);
       release(&bcache.lock);
       acquiresleep(&b->lock);
       return b;
     }
   }
+  release(&bcache.bucket_locks[idx]);
+  //第三阶段：全场搜寻并跨桶迁移寻找 refcnt == 0 且 timestamp 最小的 buffer，并把它从旧桶搬到新桶。
+  struct buf *victim=0;
+  uint min_ticks=0xffffffff;
+  for (b=bcache.buf;b<bcache.buf+NBUF;b++){
+    if (b->refcnt==0 && b->timestamp<min_ticks){
+      min_ticks=b->timestamp;
+      victim=b;
+    }
+  }
+  if(victim == 0) panic("bget: no buffers");
+  // 4. 将牺牲者从旧桶搬运到当前桶 (idx)
+  int old_idx=victim->blockno%NBUCKETS;
+  // 如果牺牲者不在当前桶，需要拿旧桶的锁来修改链表
+  if (old_idx!=idx){
+    acquire(&bcache.bucket_locks[old_idx]);
+    // 从旧桶双向链表中删除 (你的双向链表逻辑在这里派上用场)
+    victim->prev->next = victim->next;
+    if(victim->next)
+      victim->next->prev = victim->prev;
+    
+    release(&bcache.bucket_locks[old_idx]);
+    // 插入到新桶 idx 的头部
+    acquire(&bcache.bucket_locks[idx]);
+    victim->next = bcache.buckets[idx].next;
+    victim->prev = &bcache.buckets[idx];
+    if(bcache.buckets[idx].next)
+      bcache.buckets[idx].next->prev = victim;
+    bcache.buckets[idx].next = victim;
+  }else {
+    // 如果碰巧在同一个桶，只需要拿一个锁（或者已经拿着了）
+    acquire(&bcache.bucket_locks[idx]);
+  }
+  // 5. 更新 buffer 信息
+  victim->dev = dev;
+  victim->blockno = blockno;
+  victim->valid = 0;
+  victim->refcnt = 1;
 
-  // Not cached.
-  // Recycle the least recently used (LRU) unused buffer.
-  for(b = bcache.head.prev; b != &bcache.head; b = b->prev){
-    if(b->refcnt == 0) {
-      b->dev = dev;
-      b->blockno = blockno;
-      b->valid = 0;
-      b->refcnt = 1;
-      release(&bcache.lock);
-      acquiresleep(&b->lock);
-      return b;
-    }
-  }
-  panic("bget: no buffers");
+  release(&bcache.bucket_locks[idx]);
+  release(&bcache.lock);
+  acquiresleep(&victim->lock);
+  return victim;
 }
+  
+
+
+
 
 // Return a locked buf with the contents of the indicated block.
 struct buf*
