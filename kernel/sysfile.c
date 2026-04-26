@@ -499,9 +499,11 @@ uint64 sys_symlink(void){
     return -1;
   }
   // target 路径写入inode 数据块中
-  if(writei(ip, 0, (uint64)target, 0, strlen(target))!= sizeof(target))
-    panic("unlink: writei");
-  
+  if(writei(ip, 0, (uint64)target, 0, strlen(target))!= sizeof(target)){
+    iunlockput(ip); // 如果失败，记得释放锁
+    end_op();
+    return -1;
+  }
   iunlockput(ip);
   end_op();
   return 0;
