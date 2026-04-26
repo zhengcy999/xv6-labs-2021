@@ -401,6 +401,33 @@ bmap(struct inode *ip, uint bn)
     return addr;
   }
 
+  bn-=NINDIRECT;
+  if(bn < DINDIRECT){
+    // Load DOUBLE indirect block, allocating if necessary.
+    if((addr = ip->addrs[NDIRECT+1]) == 0)
+      ip->addrs[NDIRECT+1] = addr = balloc(ip->dev);
+    bp = bread(ip->dev, addr);
+    a = (uint*)bp->data;
+    // 在一级索引中找到“二级索引快”的地址
+    uint idx1=bn/NINDIRECT;
+    if ((addr=a[idx1])==0){
+      a[idx1] = addr = balloc(ip->dev);
+      log_write(bp);
+    }
+    brelse(bp);
+
+    struct buf *bp2 = bread(ip->dev, addr);
+    uint *a2 = (uint*)bp2->data;
+    uint idx2=bn%NINDIRECT;
+    if ((addr=a2[idx2])==0){
+      a2[idx2] = addr = balloc(ip->dev);
+      log_write(bp2);
+    }
+    brelse(bp2);
+    return addr;
+  }
+
+
   panic("bmap: out of range");
 }
 
