@@ -484,3 +484,25 @@ sys_pipe(void)
   }
   return 0;
 }
+
+uint64 sys_symlink(void){
+  char target[MAXPATH], path[MAXPATH];
+  struct inode *ip;
+  //使用 argstr 获取 target（链接指向的路径）和 path（链接文件本身的路径）。
+  if((argstr(0, path, MAXPATH)) < 0 || argstr(1, path, MAXPATH) < 0){
+    return -1;
+  }
+  begin_op();
+  //创建 Inode：调用内核现有的 create(path, T_SYMLINK, 0, 0) 函数。
+  if ((ip=create(path, T_SYMLINK, 0, 0))==0){
+    end_op();
+    return -1;
+  }
+  // target 路径写入inode 数据块中
+  if(writei(ip, 0, (uint64)target, 0, strlen(target))!= sizeof(target))
+    panic("unlink: writei");
+  
+  iunlockput(ip);
+  end_op();
+  return 0;
+}
